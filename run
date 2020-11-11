@@ -1,0 +1,57 @@
+#!/bin/sh
+
+echo compiling guc
+g++ -g guc.cpp -o guc
+ex=$?
+if [ $ex -gt 0 ]; then
+    echo "compilation failed. exit code $ex"
+    exit 1
+fi
+
+echo compiling gcp
+g++ -g gcp.cpp -o gcp
+ex=$?
+if [ $ex -gt 0 ]; then
+    echo "compilation failed. exit code $ex"
+    exit 1
+fi
+
+#############################################################################
+echo creating rand.bin filled with random data from /dev/urandom
+dd if=/dev/urandom of=rand.bin bs=1024 count=1024 2>&1 | grep -v records
+echo creating 1.zip from rand.bin and deleting rand.bin
+/bin/rm -f 1.zip
+/bin/rm -f 2.zip
+zip -9 1.zip rand.bin
+/bin/rm -f rand.bin
+
+echo running gcp to create 1.zip.comp from 1.zip
+# gdb --args gcp 1.zip
+gcp 1.zip
+ex=$?
+if [ $ex -gt 0 ]; then
+    echo gcp failed to exit cleanly. Exit code $ex.  Cleaning up and exiting.
+    /bin/rm -f 1.zip
+    /bin/rm -f 1.zip.comp
+    exit 2
+fi
+
+echo creating 2.zip from 1.zip.comp
+zip -9 2.zip 1.zip.comp
+ex=$?
+if [ $ex -gt 0 ]; then
+    echo failed to zip 1.zip.comp
+    exit 3
+fi
+
+echo running guc to create 1.zip.comp.out from 1.zip.comp
+guc 1.zip.comp
+ex=$?
+if [ $ex -gt 0 ]; then
+    echo failed run guc
+    /bin/rm -f 1.zip.comp.out
+    exit 3
+fi
+
+echo comparing 1.zip and 1.zip.comp.out
+cmp -l 1.zip 1.zip.comp.out | more
